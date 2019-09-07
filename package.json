@@ -1,0 +1,27 @@
+{
+  "name": "goose-runner",
+  "version": "1.0.0",
+  "description": "Runner for GOOSE registration system",
+  "main": "app.js",
+  "dependencies": {
+    "amqplib": "^0.5.5",
+    "dotenv": "^8.1.0",
+    "handlebars": "^4.2.0",
+    "mongodb": "^3.3.2",
+    "nodemailer": "^6.3.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Masseyhacks/goose-runner.git"
+  },
+  "author": "MasseyHacks",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Masseyhacks/goose-runner/issues"
+  },
+  "homepage": "https://github.com/Masseyhacks/goose-runner#readme"
+}
