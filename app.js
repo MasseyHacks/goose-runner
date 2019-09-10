@@ -71,30 +71,51 @@ function sendEmail(params, template){
   htmlEmail = template(params)
 }
 
-async function sendTemplateEmail(params, templateName, baseHTML = "", templateHTML = ""){
-  let baseTemplate;
-  if(baseHTML === ""){
-    baseTemplate = await retrieveTemplate("base");
-    baseTemplate = baseTemplate.template;
-  }
-  else{
-    baseTemplate = baseHTML;
-  }
-  
-  console.log("here");
-  
-  let completedTemplate;
-  if(templateHTML === ""){
-    completedTemplate = await assembleTemplate(baseTemplate, templateName);
+async function sendTemplateEmail(recipient, title, dataPack, {templateName="", baseHTML="", templateHTML="", completedHTML=""}){
+  let templateBar;
+  if(completedHTML === ""){
+    let baseTemplate;
+    if(baseHTML === ""){
+      baseTemplate = await retrieveTemplate("base");
+      baseTemplate = baseTemplate.template;
+    }
+    else{
+      baseTemplate = baseHTML;
+    }
+    
+    let completedTemplate;
+    if(templateHTML === ""){
+      completedTemplate = await assembleTemplate(baseTemplate, templateName);
+    }
+    else {
+      completedTemplate = templateHTML;
+    }
+    
+    templateBar = handlebars.compile(completedTemplate);
+    
   }
   else {
-    completedTemplate = templateHTML;
+    templateBar = handlebars.compile(templateHTML);
   }
   
-  let templateBar = handlebars.compile(completedTemplate);
-  let templateFinal = templateBar(params);
-  console.log("sgasg");
-  console.log(templateFinal);
+  let templateFinal = templateBar(dataPack);
+  
+  var email_message = {//construct the message
+      from: process.env.EMAIL_CONTACT,
+      to: recipient,
+      subject: title,
+      text: 'Your email client does not support the viewing of HTML emails. Please consider enabling HTML emails in your settings, or downloading a client capable of viewing HTML emails.',
+      html: templateFinal
+  };
+
+  transporter.sendMail(email_message, function(error,response){//send the email
+      if(error){
+          console.log(error,response);
+      }
+      else{
+          console.log('email sent');
+      }
+  });
 }
 
 
@@ -126,8 +147,32 @@ function retrieveTemplate(name){
   
 }
 
-let handleMap = {
-  "cleanup": deleteInactive
+async function clearEmailQueue(name){
+  dbo.collection("queuedemails").find({"template": name}, function(err, queuedEmails){
+    let baseTemplate = await retrieveTemplate("base");
+    let templateHTML = await retrieveTemplate(name);
+    let completedTemplate = baseTemplate.replace('{{emailData}}',template.template);
+    
+    for(let i=0;i<queuedEmails.length;i++){
+      sendTemplateEmail(queuedEmails[i]["email"], queuedEmails[i]["title"], queueEmails[i]["data"], {"completedHTML": completedTemplate})
+    }
+  })
+}
+
+async function clearAllEmals(){
+  dbo.collection("queuedemails").find({}, function(err, queuedEmails){
+    let baseTemplate = await retrieveTemplate("base");
+    let templateHTML;
+    let cache = {};
+    
+    for(let i=0;i<queuedEmails.length;i++){
+      if(!cache.hasOwnProperty(queuedEmails[i]["template"])){
+        cache[queuedEmails[i]["template"]] = await retrieveTemplate(queuedEmails[i]["template"]);
+      }
+      templateHTML = cache[queuedEmails[i]["template"]];
+      sendTemplateEmail(queuedEmails[i]["email"], queuedEmails[i]["title"], queuedEmails[i]["data"], {"baseHTML": baseTemplate, "templateHTML": templateHTML});
+    }
+  })
 }
 
 MongoClient.connect(url, function(err, db) {
@@ -177,7 +222,14 @@ amqp.connect(process.env.AMQP_URL, function(error0, connection) {
             retrieveTemplate(request["data"]["name"]);
             break;
           case 'email.send':
-            sendTemplateEmail(request["data"]["variables"], request["data"]["name"])
+            sendTemplateEmail(request["data"]["recipient"], request["data"]["title"], request["data"]["datapack"], {"templateName": request["data"]["template"]});
+            break;
+          case 'email.clearqueue':
+            clearEmailQueue(request["data"]["queue"]);
+            break;
+          case 'email.clearall':
+            clearAllEmals();
+            break;
           default:
             // code
         }
